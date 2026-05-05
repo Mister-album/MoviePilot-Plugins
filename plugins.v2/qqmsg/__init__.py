@@ -21,7 +21,7 @@ class QqMsg(_PluginBase):
     # 主题色
     plugin_color = "#fdfffd"
     # 插件版本
-    plugin_version = "1.0"
+    plugin_version = "1.1"
     # 插件作者
     plugin_author = "anjoyli"
     # 作者主页
@@ -47,8 +47,20 @@ class QqMsg(_PluginBase):
     _testonce = False
     is_register = False
 
+    def _get_runtime_config_prefix(self) -> str:
+        # 分身后的类名会变化，配置前缀也要跟着变化，避免多个实例共用同一份配置。
+        return f"{self.__class__.__name__.lower()}_"
+
+    def _get_runtime_module_path(self) -> str:
+        # 使用当前运行模块路径加载子模块，避免分身时回退到原始插件命名空间。
+        return self.__class__.__module__
+
     def init_plugin(self, config: dict = None):
         logger.info(f"初始化插件 {self.plugin_name}")
+        runtime_prefix = self._get_runtime_config_prefix()
+        # 宿主后续读写配置时继续使用当前实例的前缀。
+        self.plugin_config_prefix = runtime_prefix
+        self.__class__.plugin_config_prefix = runtime_prefix
         if config:
             self._enabled = config.get("enabled")
             self._send_type = config.get("send_type")
@@ -92,7 +104,8 @@ class QqMsg(_PluginBase):
 
     def register_module(self):
         modules = ModuleHelper.load(
-            "app.plugins.qqmsg",
+            # 分身场景下按当前模块路径加载，避免不同实例注册到同一组模块。
+            self._get_runtime_module_path(),
             filter_func=lambda _, obj: hasattr(obj, 'init_module') and hasattr(obj, 'init_setting')
         )
         logger.info(f"Moudles: {modules}")
@@ -110,7 +123,8 @@ class QqMsg(_PluginBase):
 
     def unregister_module(self):
         modules = ModuleHelper.load(
-            "app.plugins.qqmsg",
+            # 卸载时同样使用运行时模块路径，确保只清理当前实例对应的模块。
+            self._get_runtime_module_path(),
             filter_func=lambda _, obj: hasattr(obj, 'init_module') and hasattr(obj, 'init_setting')
         )
         for module in modules:

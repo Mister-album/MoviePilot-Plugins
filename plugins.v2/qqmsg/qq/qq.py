@@ -11,13 +11,13 @@ from app.core.metainfo import MetaInfo
 from app.log import logger
 from app.utils.common import retry
 from app.utils.http import RequestUtils
-from app.utils.singleton import Singleton
 from app.utils.string import StringUtils
 
 # apihelper.proxy = settings.PROXY
 
 
-class QQ(metaclass=Singleton):
+# 发送器不能是单例，否则多个插件分身会互相覆盖 URL 和目标账号。
+class QQ:
     _ds_url = None
     _qq_number = None
     _event = Event()

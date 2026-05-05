@@ -5,9 +5,11 @@ from app.core.context import MediaInfo, Context
 from app.core.config import settings
 from app.log import logger
 from app.modules import _ModuleBase, _MessageBase
-from app.plugins.qqmsg.qq.qq import QQ
 from app.schemas import MessageChannel, CommingMessage, Notification
 from app.schemas.types import ModuleType
+
+# 使用相对导入，避免分身时固定绑定到原始插件路径。
+from .qq import QQ
 
 
 class QQModule(_ModuleBase, _MessageBase[QQ]):
