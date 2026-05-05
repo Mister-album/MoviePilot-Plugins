@@ -363,7 +363,11 @@ class QqMsg(_PluginBase):
         # 文本
         text = msg_body.get("text")
         # 图片
-        image = msg_body.get("image")
+        image = self.__normalize_image_url(msg_body.get("image"))
+        logger.info(
+            f"QQ消息字段：type={msg_type}, send_type={self._send_type}, "
+            f"has_text={bool(text)}, has_image={bool(image)}, image={image}"
+        )
 
         if not title and not text:
             logger.warn("标题和内容不能同时为空")
@@ -398,22 +402,64 @@ class QqMsg(_PluginBase):
             headers['Authorization'] = f"Bearer {self._token}"
 
         if self._send_type == "send_private_msg":
+            headers['content-type'] = 'application/json'
             req_json = {
                 "user_id": self._qq_number,
+                "message": self.__build_http_message(content=content, image=image)
             }
-            return self.__post_request(f"{message_url}/{self._send_type}", headers, {**req_json, **{'message': f'''#{title}\n{content}'''}})
+            logger.info(
+                f"发送QQ私聊：target={self._qq_number}, has_image={bool(image)}, "
+                f"segments={req_json.get('message')}"
+            )
+            return self.__post_json_request(f"{message_url}/{self._send_type}", headers, req_json)
         elif self._send_type == "send_group_msg":
+            headers['content-type'] = 'application/json'
             req_json = {
                 "group_id": self._qq_number,
+                "message": self.__build_http_message(content=content, image=image)
             }
-            return self.__post_request(f"{message_url}/{self._send_type}", headers, {**req_json, **{'message': f'''#{title}\n{content}'''}})
+            logger.info(
+                f"发送QQ群聊：target={self._qq_number}, has_image={bool(image)}, "
+                f"segments={req_json.get('message')}"
+            )
+            return self.__post_json_request(f"{message_url}/{self._send_type}", headers, req_json)
         elif self._send_type == "send_fastapi_msg":
             headers['content-type'] = 'application/json'
             req_json = {
                 "user_id": self._qq_number,
             }
+            logger.info(
+                f"发送QQ fastapi：target={self._qq_number}, has_image={bool(image)}"
+            )
             return self.__post_fastapi_request(f"{message_url}/send_fastapi_msg", headers, {**req_json, **data})
   
+    def __normalize_image_url(self, image: str = "") -> str:
+        if not image:
+            return ""
+        normalized = str(image).strip().strip("`").strip()
+        if normalized != image:
+            logger.info(f"清洗图片URL：raw={image}, normalized={normalized}")
+        return normalized
+
+
+    def __build_http_message(self, content: str, image: str = ""):
+        # NapCat/OneBot11 支持消息段，按“文本在前、图片在后”构造即可实现尾部插图。
+        message = [{
+            "type": "text",
+            "data": {
+                "text": f"#{content}"
+            }
+        }]
+        if image:
+            message.append({
+                "type": "image",
+                "data": {
+                    "file": image
+                }
+            })
+        logger.info(f"构造QQ消息段完成：segment_count={len(message)}, has_image={bool(image)}")
+        return message
+
 
     def __post_request(self, message_url, headers, req_json):
         """
@@ -433,6 +479,33 @@ class QqMsg(_PluginBase):
             else:
                 return False, "未获取到返回信息"
         except Exception as err:
+            return False, str(err)
+
+    def __post_json_request(self, message_url, headers, req_json):
+        """
+        向qq发送JSON消息段请求
+        """
+        try:
+            logger.info(f"请求NapCat JSON接口：url={message_url}")
+            res = RequestUtils(headers=headers).post(
+                message_url,
+                data=json.dumps(req_json, ensure_ascii=False).encode('utf-8')
+            )
+            if res and res.status_code == 200:
+                ret_json = res.json()
+                logger.info(f"NapCat JSON响应：status_code=200, body={ret_json}")
+                if ret_json.get('retcode') == 0:
+                    return True, ret_json.get('status')
+                else:
+                    return False, ret_json.get('status')
+            elif res is not None:
+                logger.warning(f"NapCat JSON响应异常：status_code={res.status_code}, reason={res.reason}")
+                return False, f"错误码：{res.status_code}，错误原因：{res.reason}"
+            else:
+                logger.warning("NapCat JSON响应为空")
+                return False, "未获取到返回信息"
+        except Exception as err:
+            logger.error(f"NapCat JSON请求异常：{str(err)}")
             return False, str(err)
 
     def __post_fastapi_request(self, message_url, headers, req_json):
