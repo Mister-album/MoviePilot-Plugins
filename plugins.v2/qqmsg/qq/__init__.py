@@ -110,7 +110,7 @@ class QQModule(_ModuleBase, _MessageBase[QQ]):
                                       userid=user_id, username=user_name, text=text)
         return None
 
-    def post_message(self, message: Notification) -> None:
+    def post_message(self, message: Notification, **kwargs) -> None:
         """
         发送消息
         :param message: 消息体
@@ -119,7 +119,7 @@ class QQModule(_ModuleBase, _MessageBase[QQ]):
         self.qq.send_msg(title=message.title, text=message.text,
                                image=message.image, userid=message.userid)
 
-    def post_medias_message(self, message: Notification, medias: List[MediaInfo]) -> Optional[bool]:
+    def post_medias_message(self, message: Notification, medias: List[MediaInfo], **kwargs) -> Optional[bool]:
         """
         发送媒体信息选择列表
         :param message: 消息体
@@ -129,7 +129,7 @@ class QQModule(_ModuleBase, _MessageBase[QQ]):
         return self.qq.send_meidas_msg(title=message.title, medias=medias,
                                              userid=message.userid)
 
-    def post_torrents_message(self, message: Notification, torrents: List[Context]) -> Optional[bool]:
+    def post_torrents_message(self, message: Notification, torrents: List[Context], **kwargs) -> Optional[bool]:
         """
         发送种子信息选择列表
         :param message: 消息体
