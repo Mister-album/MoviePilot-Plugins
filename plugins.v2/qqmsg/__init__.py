@@ -124,7 +124,7 @@ class QqMsg(_PluginBase):
 
 
     def get_state(self) -> bool:
-        return self._enabled and (True if self._token else False)
+        return self._enabled and bool(self._send_msg_url) and bool(self._qq_number)
 
     @staticmethod
     def get_command() -> List[Dict[str, Any]]:
@@ -372,10 +372,6 @@ class QqMsg(_PluginBase):
     def send_msg_to_qq(self, title, text="", image="", user=""):
         headers = {'content-type': 'application/x-www-form-urlencoded'}
         message_url = self._send_msg_url
-        req_json = {
-            "user_id": self._qq_number,
-        }
-        
         content = "%s\n%s" % (title, text.replace("\n\n", "\n")) if text else title
         data = {
             "user": user,
@@ -387,10 +383,21 @@ class QqMsg(_PluginBase):
         if self._token:
             headers['Authorization'] = f"Bearer {self._token}"
 
-        if self._send_type == "send_private_msg" or self._send_type == "send_group_msg":
+        if self._send_type == "send_private_msg":
+            req_json = {
+                "user_id": self._qq_number,
+            }
+            return self.__post_request(f"{message_url}/{self._send_type}", headers, {**req_json, **{'message': f'''#{title}\n{content}'''}})
+        elif self._send_type == "send_group_msg":
+            req_json = {
+                "group_id": self._qq_number,
+            }
             return self.__post_request(f"{message_url}/{self._send_type}", headers, {**req_json, **{'message': f'''#{title}\n{content}'''}})
         elif self._send_type == "send_fastapi_msg":
             headers['content-type'] = 'application/json'
+            req_json = {
+                "user_id": self._qq_number,
+            }
             return self.__post_fastapi_request(f"{message_url}/send_fastapi_msg", headers, {**req_json, **data})
   
 
